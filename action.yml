@@ -27,9 +27,6 @@ inputs:
   atomic:
     description: If true, upgrade process rolls back changes made in case of failed upgrade. Defaults to true.
     required: false
-  helm:
-    description: Helm binary to execute, one of [helm, helm3].
-    required: false
   token:
     description: Github repository token. If included and the event is a deployment
       the deployment_status event will be fired.
@@ -45,6 +42,32 @@ inputs:
   version:
     description: Version of the app, usually commit sha works here.
     required: false
+  chart-version:
+    description: The version of the helm chart you want to deploy (distinct from app version)
+    required: false
+  track:
+    description: Track for the deployment. If the track is not "stable" it activates the canary workflow described in the docs.
+    required: false
+  timeout:
+    description: Time to wait till helm action is exected
+    required: false
+  repo:
+    description: Helm chart repository to be added.
+    required: false
+  repo-alias:
+    description: Helm repository alias that will be used.
+    required: false
+  repo-username:
+    description: Helm repository username if authentication is needed.
+    required: false
+  repo-password:
+    description: Helm repository password if authentication is needed.
+    required: false
+  kube-config-server-url:
+    description: URL from kube config server to get generated kubeconfig
+    required: false
 runs:
   using: docker
-  image: Dockerfile
+  #see https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions
+  #image: Dockerfile 
+  image: docker://docker-dev.fntgrp.com/fntsoftware/it-services/tools/helm-action

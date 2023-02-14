@@ -2,3 +2,4 @@ apiVersion: v1
 description: A Helm chart for Kubernetes
 name: app
 version: 0.0.2
+icon: http://fntsoftware.com/blog/wp-content/uploads/logo/logo-fnt.svg

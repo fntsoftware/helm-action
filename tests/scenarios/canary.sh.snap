@@ -15,8 +15,12 @@
 ::debug::param: timeout = ""
 ::debug::param: repository = ""
 ::debug::param: atomic = "true"
-::debug::env: KUBECONFIG="undefined"
-::debug::rendering value files [./values.yml] with: {"secrets":{"secret":"val"}}
-[command]helm upgrade app-canary /usr/src/charts/app --install --wait --namespace=default --set=app.name=app --set=app.version=1234 --values=./values.yml --set=service.enabled=false --set=ingress.enabled=false --atomic
-helm upgrade app-canary /usr/src/charts/app --install --wait --namespace=default --set=app.name=app --set=app.version=1234 --values=./values.yml --set=service.enabled=false --set=ingress.enabled=false --atomic
+::debug::param: repo = ""
+::debug::param: repoAlias = ""
+::debug::param: repoUsername = ""
+::debug::param: repoPassword = ""
+::debug::param: kubeConfigServerURL = ""
+::debug::rendering value files [/usr/src/values.yml] with: {"secrets":{"secret":"val"}}
+[command]/tmp/bin/helm3 upgrade app-canary /usr/src/charts/app --install --wait --namespace=default --set=app.name=app --set=app.version=1234 --values=/usr/src/values.yml --set=service.enabled=false --set=ingress.enabled=false --atomic
+helm3 upgrade app-canary /usr/src/charts/app --install --wait --namespace=default --set=app.name=app --set=app.version=1234 --values=/usr/src/values.yml --set=service.enabled=false --set=ingress.enabled=false --atomic
 ::debug::not setting deployment status

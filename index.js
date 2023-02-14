@@ -4,6 +4,7 @@ const exec = require("@actions/exec");
 const fs = require("fs");
 const util = require("util");
 const Mustache = require("mustache");
+const http = require('http'); 
 
 const writeFile = util.promisify(fs.writeFile);
 const readFile = util.promisify(fs.readFile);
@@ -139,10 +140,7 @@ function renderFiles(files, data) {
  * @param {string} release
  */
 function deleteCmd(helm, namespace, release) {
-  if (helm === "helm3") {
     return ["delete", "-n", namespace, release];
-  }
-  return ["delete", "--purge", release];
 }
 
 /**
@@ -164,12 +162,19 @@ async function run() {
     const version = getInput("version");
     const valueFiles = getValueFiles(getInput("value_files"));
     const removeCanary = getInput("remove_canary");
-    const helm = getInput("helm") || "helm";
     const timeout = getInput("timeout");
     const repository = getInput("repository");
     const dryRun = core.getInput("dry-run");
     const secrets = getSecrets(core.getInput("secrets"));
     const atomic = getInput("atomic") || true;
+    const repo = getInput("repo");
+    const repoAlias = getInput("repo-alias");
+    const repoUsername = getInput("repo-username");
+    const repoPassword = getInput("repo-password");
+    const kubeConfigServerURL = getInput("kube-config-server-url");
+    //set static variables 
+    const helm = "helm3";
+    const kubeConfigFile = "/usr/src/kubeconfig.yml"
 
     core.debug(`param: track = "${track}"`);
     core.debug(`param: release = "${release}"`);
@@ -187,7 +192,65 @@ async function run() {
     core.debug(`param: timeout = "${timeout}"`);
     core.debug(`param: repository = "${repository}"`);
     core.debug(`param: atomic = "${atomic}"`);
+    core.debug(`param: repo = "${repo}"`);
+    core.debug(`param: repoAlias = "${repoAlias}"`);
+    core.debug(`param: repoUsername = "${repoUsername}"`);
+    core.debug(`param: repoPassword = "${repoPassword}"`);
+    core.debug(`param: kubeConfigServerURL = "${kubeConfigServerURL}"`);
 
+    // Setup necessary files.
+    if (process.env.KUBECONFIG_FILE) {
+      process.env.KUBECONFIG = kubeConfigFile;
+      await writeFile(process.env.KUBECONFIG, process.env.KUBECONFIG_FILE);
+      core.debug(`env: KUBECONFIG="${process.env.KUBECONFIG}"`);
+    }
+    else if (kubeConfigServerURL !== "") {
+      process.env.KUBECONFIG = kubeConfigFile;
+
+      //ensure new kubeconfig is used
+      await exec.exec(`rm -f ${kubeConfigFile}`);
+
+      // Get kubeconfig from config server     
+      const file = fs.createWriteStream(kubeConfigFile);
+      const request = http.get(kubeConfigServerURL, function(response) {
+        response.pipe(file);
+
+        // after download completed close filestream
+        file.on("finish", () => {
+            file.close();
+            core.debug("Download Completed");
+        });
+      });
+
+      core.debug(`generated env: KUBECONFIG="${process.env.KUBECONFIG}"`);
+    } 
+
+    // Per https://helm.sh/docs/faq/#xdg-base-directory-support
+    process.env.XDG_DATA_HOME = "/root/.helm/"
+    process.env.XDG_CACHE_HOME = "/root/.helm/"
+    process.env.XDG_CONFIG_HOME = "/root/.helm/"
+    
+    // Add custom helm repository
+    if (repo !== "") {
+      if (repoAlias === "") {
+        throw new Error("repo alias is required when you are setting a repository");
+      }
+  
+      core.debug(`adding custom repository ${repo} with alias ${repoAlias}`);
+  
+      const argsRepo = [
+        "repo",
+        "add",
+        repoAlias,
+        repo,
+      ]
+  
+      if (repoUsername) argsRepo.push(`--username=${repoUsername}`);
+      if (repoPassword) argsRepo.push(`--password=${repoPassword}`);
+  
+      await exec.exec(helm, argsRepo);
+      await exec.exec(helm, ["repo", "update"])
+    }
 
     // Setup command options and arguments.
     const args = [
@@ -199,15 +262,6 @@ async function run() {
       `--namespace=${namespace}`,
     ];
 
-    // Per https://helm.sh/docs/faq/#xdg-base-directory-support
-    if (helm === "helm3") {
-      process.env.XDG_DATA_HOME = "/root/.helm/"
-      process.env.XDG_CACHE_HOME = "/root/.helm/"
-      process.env.XDG_CONFIG_HOME = "/root/.helm/"
-    } else {
-      process.env.HELM_HOME = "/root/.helm/"
-    }
-
     if (dryRun) args.push("--dry-run");
     if (appName) args.push(`--set=app.name=${appName}`);
     if (version) args.push(`--set=app.version=${version}`);
@@ -215,7 +269,7 @@ async function run() {
     if (timeout) args.push(`--timeout=${timeout}`);
     if (repository) args.push(`--repo=${repository}`);
     valueFiles.forEach(f => args.push(`--values=${f}`));
-    args.push("--values=./values.yml");
+    args.push("--values=/usr/src/values.yml");
 
     // Special behaviour is triggered if the track is labelled 'canary'. The
     // service and ingress resources are disabled. Access to the canary
@@ -229,17 +283,10 @@ async function run() {
       args.push("--atomic");
     }
 
-    // Setup necessary files.
-    if (process.env.KUBECONFIG_FILE) {
-      process.env.KUBECONFIG = "./kubeconfig.yml";
-      await writeFile(process.env.KUBECONFIG, process.env.KUBECONFIG_FILE);
-    }
-    await writeFile("./values.yml", values);
-
-    core.debug(`env: KUBECONFIG="${process.env.KUBECONFIG}"`);
+    await writeFile("/usr/src/values.yml", values);
 
     // Render value files using github variables.
-    await renderFiles(valueFiles.concat(["./values.yml"]), {
+    await renderFiles(valueFiles.concat(["/usr/src/values.yml"]), {
       secrets,
       deployment: context.payload.deployment,
     });
@@ -267,6 +314,7 @@ async function run() {
     core.setFailed(error.message);
     await status("failure");
   }
+
 }
 
 run();

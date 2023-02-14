@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.8.0] (2023-02-21)
+
+
+### Features
+
+* Add custom repo configuration
+* Add download of generated kubeconfig 
+* Changed baseimage from alpine to ubuntu
+* Updated npm packages
+* Removed Helm v2 support
+
+
 ## [1.7.0](https://github.com/deliverybot/helm/compare/v1.6.1...v1.7.0) (2021-01-09)
 
 

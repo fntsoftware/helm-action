@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.8.1] (2023-02-21)
+
+
+### Features
+
+* Add kubeconfig generation based on cert and token via env variable
+* Added kubeconfig
+
+
 ## [1.8.0] (2023-02-21)
 
 

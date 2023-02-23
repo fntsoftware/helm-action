@@ -2,10 +2,13 @@ name: 'Test'
 on: ['push']
 
 jobs:
-
   test:
-    runs-on: 'ubuntu-latest'
-
+    runs-on:
+      - k8s
+      - github-action-runner-pod
+      - on-prem
+      - development-cluster
+      
     steps:
     - uses: 'actions/checkout@v1'
 

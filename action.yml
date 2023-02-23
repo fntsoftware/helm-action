@@ -66,6 +66,15 @@ inputs:
   kube-config-server-url:
     description: URL from kube config server to get generated kubeconfig
     required: false
+  kube-server:
+    description: Kubernetes server adress
+    required: false
+  kube-cert:
+    description: Content of the kubernetes ca certificates file
+    required: false
+  kube-token:
+    description: Content of the kubernetes token file
+    required: false  
 runs:
   using: docker
   #see https://docs.github.com/en/actions/creating-actions/metadata-syntax-for-github-actions

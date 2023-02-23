@@ -34,6 +34,9 @@ payload if the action was triggered by a deployment.
 - `repo-username`: Helm repository username if authentication is needed.
 - `repo-password`: Helm repository password if authentication is needed.
 - `kube-config-server-url`: Kubernetes configuration server where a generated kubectl config can be downloaded 
+- `kube-server`: Kubernetes server adress
+- `kube-cert`: Content of the kubernetes ca certificates file
+- `kube-token`: Content of the kubernetes token file
 
 Additional parameters: If the action is being triggered by a deployment event
 and the `task` parameter in the deployment event is set to `"remove"` then this
@@ -69,22 +72,36 @@ jobs:
     steps:
     - uses: actions/checkout@v1
 
-    - name: 'Deploy'
-      uses: 'deliverybot/helm@v1'
+    - name: Set environment variables
+        run: |
+          TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          echo "TOKEN=$TOKEN" >> $GITHUB_ENV
+
+          CERT_CONTENT=$(cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt)
+          echo "CERT<<EOF" >> $GITHUB_ENV
+          echo $CERT_CONTENT >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+    - name: "Deploy Postgres"
+      uses: fntsoftware/helm-action@v1.8.1
       with:
-        release: 'nginx'
-        namespace: 'default'
-        chart: 'app'
-        token: '${{ github.token }}'
-        values: |
-          name: foobar
-        value-files: >-
-        [
-          "values.yaml", 
-          "values.production.yaml"
-        ]
-      env:
-        KUBECONFIG_FILE: '${{ secrets.KUBECONFIG }}'
+            #kube-config-server-url: http://kubeconfig-generator.github-actions-runners.svc.cluster.local:8080
+            kube-cert: ${{env.CERT}}
+            kube-token: ${{env.TOKEN}}
+            repo: https://artifactory.fntgrp.com/artifactory/helm3
+            repo-alias: "fnt"
+            release: "postgres-${{ github.run_id }}"
+            namespace: "github-actions-runners"
+            chart: "fnt/postgres"
+            token: "${{ github.token }}"
+            atomic: false
+            values: |
+              credentials:
+                user: postgres
+                password: postgres
+              service:
+                name: postgres-${{ github.run_id }}
+                type: ClusterIP
 ```
 
 ## Example canary

@@ -172,9 +172,15 @@ async function run() {
     const repoUsername = getInput("repo-username");
     const repoPassword = getInput("repo-password");
     const kubeConfigServerURL = getInput("kube-config-server-url");
+    const kubeServer = getInput("kube-server") || "https://kubernetes.default.svc.cluster.local";
+    let kubeCert = getInput("kube-cert");
+    const kubeToken = getInput("kube-token");
+    
     //set static variables 
     const helm = "helm3";
-    const kubeConfigFile = "/usr/src/kubeconfig.yml"
+    const kubeConfigFile = "/usr/src/kubeconfig.yml";
+    const valuesFile = "/usr/src/values.yml";
+    const certFile = "/usr/src/ca.cert";
 
     core.debug(`param: track = "${track}"`);
     core.debug(`param: release = "${release}"`);
@@ -197,12 +203,54 @@ async function run() {
     core.debug(`param: repoUsername = "${repoUsername}"`);
     core.debug(`param: repoPassword = "${repoPassword}"`);
     core.debug(`param: kubeConfigServerURL = "${kubeConfigServerURL}"`);
+    core.debug(`param: kubeServer = "${kubeServer}"`);
+    core.debug(`param: kubeCert = "${kubeCert}"`);
+    core.debug(`param: kubeToken = "${kubeToken}"`);
 
     // Setup necessary files.
     if (process.env.KUBECONFIG_FILE) {
       process.env.KUBECONFIG = kubeConfigFile;
       await writeFile(process.env.KUBECONFIG, process.env.KUBECONFIG_FILE);
       core.debug(`env: KUBECONFIG="${process.env.KUBECONFIG}"`);
+    }
+    else if (kubeCert !== "" && kubeToken !== "") {
+      process.env.KUBECONFIG = kubeConfigFile;
+
+      //format cert from env variable
+      const startCertPhrase = `-----BEGIN CERTIFICATE-----`;
+      const endCertPhrase = `-----END CERTIFICATE-----`;
+      if (kubeCert.startsWith(startCertPhrase) && kubeCert.endsWith(endCertPhrase)){
+        kubeCert = kubeCert.substring(startCertPhrase.length, kubeCert.length-endCertPhrase.length)
+        kubeCert = kubeCert.replace(/ /g, '\n');
+        await writeFile(certFile, startCertPhrase + kubeCert + endCertPhrase + '\n');
+      } else {
+        kubeCert = kubeCert.replace(/ /g, '\n');
+        await writeFile(certFile,  kubeCert + '\n');
+      }
+      
+      // Setting a cluster entry in kubeconfig
+      await exec.exec(`kubectl config set-cluster "kubernetes"`, 
+        [`--kubeconfig=${kubeConfigFile}`, 
+         `--server=${kubeServer}`,
+         `--certificate-authority=${certFile}`,
+         `--embed-certs=true`]); 
+
+      // Setting token credentials entry in kubeconfig
+      await exec.exec(`kubectl config set-credentials "github-runner"`, 
+        [`--kubeconfig=${kubeConfigFile}`, 
+         `--token=${kubeToken}`]); 
+      
+      // Setting a context entry in kubeconfig
+      await exec.exec(`kubectl config set-context "github-runner"`, 
+        [`--kubeconfig=${kubeConfigFile}`,
+         `--cluster=kubernetes`,
+         `--user=github-runner`,
+         `--namespace=${namespace}`]);
+
+      // Setting the current-context in the kubeconfig file
+      await exec.exec(`kubectl config use-context "github-runner"`, 
+        [`--kubeconfig=${kubeConfigFile}`]);
+
     }
     else if (kubeConfigServerURL !== "") {
       process.env.KUBECONFIG = kubeConfigFile;
@@ -283,10 +331,10 @@ async function run() {
       args.push("--atomic");
     }
 
-    await writeFile("/usr/src/values.yml", values);
+    await writeFile(valuesFile, values);
 
     // Render value files using github variables.
-    await renderFiles(valueFiles.concat(["/usr/src/values.yml"]), {
+    await renderFiles(valueFiles.concat([valuesFile]), {
       secrets,
       deployment: context.payload.deployment,
     });

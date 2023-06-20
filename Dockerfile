@@ -1,7 +1,7 @@
 FROM ubuntu
 
 ENV HELM_BASE_URL="https://get.helm.sh"
-ENV HELM_3_FILE="helm-v3.11.1-linux-amd64.tar.gz"
+ENV HELM_3_FILE="helm-v3.12.1-linux-amd64.tar.gz"
 ENV KUBECTL_BASE_URL="https://dl.k8s.io/release/"
 ENV PYTHONPATH "/usr/bin/python3"
 
